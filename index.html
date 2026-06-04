@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learning OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#08080f; --surf:#111128; --surf2:#181832; --border:#252545;
+  --gold:#ffd700; --green:#4ade80; --blue:#60a5fa; --red:#f87171;
+  --purple:#a78bfa; --cyan:#22d3ee; --text:#e2e8f0; --muted:#6b7280;
+  --font:'Press Start 2P',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:10px;line-height:1.8}
+
+/* HEADER */
+.hdr{position:sticky;top:0;z-index:50;background:#0a0a1e;border-bottom:2px solid var(--gold);padding:10px 16px;display:flex;align-items:center;gap:12px}
+.hdr-title{color:var(--gold);font-size:11px;text-shadow:0 0 14px rgba(255,215,0,.6);flex:1}
+.hdr-xp{color:var(--green);font-size:8px}
+.hdr-lv{background:var(--gold);color:#000;padding:3px 10px;font-size:8px;white-space:nowrap}
+
+/* APP */
+.app{max-width:900px;margin:0 auto;padding:14px}
+
+/* CHARACTER PANEL */
+.char-panel{background:var(--surf2);border:2px solid var(--border);padding:16px;margin-bottom:14px;display:flex;gap:16px;align-items:center}
+#charWrap{flex-shrink:0;position:relative}
+#charSVG{width:72px;height:108px;image-rendering:pixelated}
+.char-info{flex:1;min-width:0}
+.char-tier{font-size:11px;color:var(--gold);margin-bottom:4px;text-shadow:0 0 10px rgba(255,215,0,.5)}
+.char-lv{font-size:7px;color:var(--muted);margin-bottom:10px}
+.xp-bar{background:#000;border:1px solid var(--border);height:12px;overflow:hidden;margin:6px 0}
+.xp-fill{height:100%;background:linear-gradient(90deg,var(--green),#86efac);transition:width .5s}
+.xp-lbl{font-size:7px;color:var(--muted);text-align:right}
+
+/* NAV */
+.nav{display:flex;border-bottom:2px solid var(--border);margin-bottom:14px;overflow-x:auto}
+.nav-btn{background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:var(--font);font-size:8px;padding:8px 12px;cursor:pointer;margin-bottom:-2px;white-space:nowrap}
+.nav-btn.on{color:var(--gold);border-bottom-color:var(--gold)}
+.nav-btn:hover:not(.on){color:var(--text)}
+
+/* TAB */
+.tab{display:none}.tab.on{display:block}
+
+/* STATS */
+.stats{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.stat{background:var(--surf2);border:1px solid var(--border);padding:10px 12px;flex:1;min-width:70px;text-align:center}
+.stat-val{display:block;font-size:14px;color:var(--gold);margin-bottom:4px}
+.stat-lbl{font-size:6px;color:var(--muted)}
+
+/* REVIEW BANNER */
+.review-banner{background:rgba(255,215,0,.05);border:2px solid var(--gold);padding:14px;margin-bottom:14px;text-align:center}
+.review-banner h3{color:var(--gold);font-size:9px;margin-bottom:8px}
+.review-banner p{font-size:7px;color:var(--muted);margin-bottom:10px;line-height:2}
+
+/* DOMAIN GRID */
+.dg{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+
+/* DOMAIN CARD */
+.dc{background:var(--surf2);border:2px solid var(--border);padding:14px;position:relative}
+.dc:hover{border-color:#3a3a6a}
+.dc-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.dc-name{font-size:8px;margin-bottom:4px}
+.dc-icon{font-size:16px;line-height:1}
+.dc-streak{font-size:7px;color:var(--purple)}
+.prog{background:#000;border:1px solid var(--border);height:6px;margin:6px 0}
+.prog-fill{height:100%;transition:width .3s}
+.prog-fill.done{filter:brightness(1.3)}
+.dc-meta{display:flex;justify-content:space-between;font-size:6px;color:var(--muted);margin-bottom:8px}
+.dc-last{font-size:6px;color:var(--muted);margin-bottom:10px}
+.dc-add{position:absolute;top:10px;right:10px;background:var(--gold);color:#000;border:none;font-family:var(--font);font-size:9px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.dc-add:hover{background:#ffe84d}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal-bg.center{align-items:center}
+.modal{background:var(--surf2);border:2px solid var(--gold);width:100%;max-width:480px;padding:0;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-hdr h2{font-size:9px;color:var(--gold)}
+.modal-close{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0 4px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:14px}
+
+/* ACTIVITY LIST */
+.act-list{display:flex;flex-direction:column;gap:6px}
+.act-btn{background:var(--surf);border:1px solid var(--border);padding:12px 14px;cursor:pointer;text-align:left;font-family:var(--font);font-size:7px;color:var(--text);display:flex;justify-content:space-between;align-items:center;transition:all .15s}
+.act-btn:hover{border-color:var(--gold);background:rgba(255,215,0,.06)}
+.act-xp{color:var(--gold);white-space:nowrap;margin-left:8px}
+.act-label{line-height:1.8;flex:1}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;right:20px;background:var(--surf2);border:2px solid var(--gold);padding:12px 16px;font-size:8px;z-index:999;max-width:300px;display:none;line-height:2}
+#toast.bad{border-color:var(--red)}
+#toast.lvl{border-color:#fff;background:#0a0820;color:#fff}
+
+/* LOG */
+.log-wrap{overflow-x:auto}
+.log-tbl{width:100%;border-collapse:collapse;font-size:7px}
+.log-tbl th{text-align:left;color:var(--gold);padding:6px 8px;border-bottom:1px solid var(--border)}
+.log-tbl td{padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted)}
+.log-tbl tr:hover td{color:var(--text)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+
+/* RESOURCES */
+.res-form{display:flex;gap:8px;margin-bottom:14px}
+.res-inp{flex:1;background:var(--surf);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:8px;padding:8px}
+.res-inp::placeholder{color:var(--muted)}
+.res-item{background:var(--surf2);border:1px solid var(--border);padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.res-left{flex:1}
+.res-name{font-size:8px;margin-bottom:4px}
+.res-meta{font-size:6px;color:var(--muted)}
+.res-warn{color:var(--red)}
+.res-btns{display:flex;gap:4px}
+
+/* BUTTONS */
+.btn{font-family:var(--font);font-size:7px;padding:5px 10px;border:1px solid;cursor:pointer}
+.btn-gold{background:var(--gold);color:#000;border:none;font-family:var(--font);font-size:8px;padding:8px 16px;cursor:pointer}
+.btn-gold:hover{background:#ffe84d}
+.btn-sm{background:none;border:1px solid var(--green);color:var(--green);font-family:var(--font);font-size:7px;padding:4px 8px;cursor:pointer}
+.btn-sm:hover{background:var(--green);color:#000}
+.btn-del{background:none;border:1px solid var(--red);color:var(--red);font-family:var(--font);font-size:7px;padding:4px 8px;cursor:pointer}
+.btn-del:hover{background:var(--red);color:#000}
+
+/* EFFECTS */
+.g-gold{animation:gg 2s ease-in-out infinite alternate}
+@keyframes gg{from{filter:drop-shadow(0 0 4px rgba(255,215,0,.5))}to{filter:drop-shadow(0 0 14px rgba(255,215,0,.9))}}
+.g-legend{animation:gl 1.5s ease-in-out infinite alternate}
+@keyframes gl{from{filter:drop-shadow(0 0 6px rgba(100,200,255,.7))}to{filter:drop-shadow(0 0 22px rgba(100,200,255,1))}}
+.g-mythic{animation:gm 1.2s ease-in-out infinite alternate}
+@keyframes gm{from{filter:drop-shadow(0 0 10px cyan) drop-shadow(0 0 20px magenta)}to{filter:drop-shadow(0 0 26px cyan) drop-shadow(0 0 42px magenta)}}
+.pulse{animation:pulse 1s ease-in-out infinite alternate}
+@keyframes pulse{from{opacity:.65}to{opacity:1}}
+.monday-tag{background:var(--gold);color:#000;font-size:6px;padding:2px 6px;margin-left:8px}
+
+/* PENALTY BOX */
+.pen-list{background:rgba(248,113,113,.08);border:1px solid var(--red);padding:10px;margin-bottom:14px;font-size:7px;color:var(--red);line-height:2.2}
+.pen-list h4{margin-bottom:6px;font-size:7px}
+
+@media(max-width:520px){
+  .hdr-title{font-size:9px}
+  .char-panel{flex-direction:column;text-align:center}
+  .stats{display:grid;grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <span class="hdr-title">&#9876; LEARNING OS</span>
+  <span class="hdr-xp" id="hdrXP">0 XP</span>
+  <span class="hdr-lv" id="hdrLv">LV.1</span>
+</header>
+
+<div class="app">
+
+  <div class="char-panel">
+    <div id="charWrap"><div id="charSVG"></div></div>
+    <div class="char-info">
+      <div class="char-tier" id="charTier">PEASANT</div>
+      <div class="char-lv" id="charLv">Level 1 &middot; Tier I</div>
+      <div class="xp-bar"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+      <div class="xp-lbl" id="xpLbl">0 / 100 XP to next level</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn on" onclick="switchTab('dash',this)">DASHBOARD</button>
+    <button class="nav-btn" onclick="switchTab('domains',this)">DOMAINS</button>
+    <button class="nav-btn" onclick="switchTab('resources',this)">RESOURCES</button>
+    <button class="nav-btn" onclick="switchTab('log',this)">LOG</button>
+  </nav>
+
+  <div id="tab-dash" class="tab on">
+    <div id="reviewBanner" class="review-banner" style="display:none">
+      <h3>WEEKLY REVIEW <span class="monday-tag pulse">MONDAY</span></h3>
+      <p>Reflect on this week and collect your reward</p>
+      <button class="btn-gold" onclick="doWeeklyReview()">COMPLETE REVIEW (+50 XP)</button>
+    </div>
+    <div id="penaltyBox" style="display:none" class="pen-list"></div>
+    <div class="stats">
+      <div class="stat"><span class="stat-val" id="sTotalXP">0</span><span class="stat-lbl">TOTAL XP</span></div>
+      <div class="stat"><span class="stat-val" id="sLevel">1</span><span class="stat-lbl">LEVEL</span></div>
+      <div class="stat"><span class="stat-val" id="sWeekXP">0</span><span class="stat-lbl">WEEK XP</span></div>
+      <div class="stat"><span class="stat-val" id="sBestStreak">0</span><span class="stat-lbl">BEST STREAK</span></div>
+    </div>
+    <div class="dg" id="dashGrid"></div>
+  </div>
+
+  <div id="tab-domains" class="tab">
+    <div class="dg" id="domainsGrid"></div>
+  </div>
+
+  <div id="tab-resources" class="tab">
+    <div class="res-form">
+      <input class="res-inp" id="resInp" placeholder="Resource name..." onkeydown="if(event.key==='Enter')addResource()">
+      <button class="btn-gold" onclick="addResource()">ADD</button>
+    </div>
+    <div id="resList"></div>
+  </div>
+
+  <div id="tab-log" class="tab">
+    <div class="log-wrap">
+      <table class="log-tbl">
+        <thead><tr><th>DATE</th><th>DOMAIN</th><th>ACTION</th><th>XP</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="modalBg" class="modal-bg" style="display:none" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-hdr">
+      <h2 id="modalTitle">LOG ACTIVITY</h2>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// ACTIVITY DEFINITIONS
+// ============================================================
+const ACTS = {
+  articulation: {
+    name:'ARTICULATION', color:'#818cf8', icon:'◈', weeklyTarget:5,
+    activities:[
+      {id:'mvh',   label:'MVH — 2 min voice memo',            xp:10, isMVH:true},
+      {id:'full',  label:'Full session (5+ min talk)',         xp:25, isMVH:true},
+      {id:'read',  label:'Read aloud + paraphrase',            xp:25, isMVH:false},
+      {id:'tech',  label:'Technique review (filler/time)',     xp:15, isMVH:false},
+      {id:'real',  label:'Real-world application (call/meeting)',xp:15,isMVH:false},
+    ]
+  },
+  ceo:{
+    name:'CEO SKILLS', color:'#f59e0b', icon:'◆', weeklyTarget:3,
+    activities:[
+      {id:'mvh',     label:'MVH — 10 pages / 15 min podcast', xp:10, isMVH:true},
+      {id:'full',    label:'Full session',                     xp:25, isMVH:true},
+      {id:'applied', label:'Applied to real situation',        xp:15, isMVH:false},
+      {id:'insight', label:'Wrote insight to notes',           xp:10, isMVH:false},
+    ]
+  },
+  kabbalah:{
+    name:'KABBALAH', color:'#a855f7', icon:'✦', weeklyTarget:5,
+    activities:[
+      {id:'mvh',       label:'MVH — 1 paragraph / 5 min',     xp:10, isMVH:true},
+      {id:'full',      label:'Full session (15+ min)',          xp:25, isMVH:true},
+      {id:'reflect',   label:'Post-challenge reflection',       xp:25, isMVH:false},
+      {id:'journal',   label:'Daily question journaling',       xp:10, isMVH:false},
+    ]
+  },
+  ai:{
+    name:'AI', color:'#4ade80', icon:'◉', weeklyTarget:3,
+    activities:[
+      {id:'mvh',     label:'MVH — consume 1 content',          xp:10, isMVH:true},
+      {id:'full',    label:'Full session',                      xp:25, isMVH:true},
+      {id:'built',   label:'Built / experimented directly',     xp:40, isMVH:false},
+      {id:'insight', label:'Wrote insight/summary',             xp:10, isMVH:false},
+    ]
+  },
+  wellness:{
+    name:'WELLNESS', color:'#f87171', icon:'♥', weeklyTarget:4,
+    activities:[
+      {id:'workout_min',  label:'Workout (20 min minimum)',     xp:10, isMVH:true},
+      {id:'full_workout', label:'Full workout session',         xp:25, isMVH:true},
+      {id:'golf',         label:'Golf session',                 xp:25, isMVH:false},
+      {id:'exceeded',     label:'Exceeded target',              xp:15, isMVH:false},
+    ]
+  }
+};
+
+const DOMAIN_KEYS = Object.keys(ACTS);
+
+const TIERS = [
+  null,
+  {name:'PEASANT',    glowClass:''},
+  {name:'WANDERER',   glowClass:''},
+  {name:'APPRENTICE', glowClass:''},
+  {name:'SQUIRE',     glowClass:''},
+  {name:'KNIGHT',     glowClass:''},
+  {name:'VETERAN',    glowClass:''},
+  {name:'CHAMPION',   glowClass:'g-gold'},
+  {name:'ELITE',      glowClass:'g-gold'},
+  {name:'LEGEND',     glowClass:'g-legend'},
+  {name:'MYTHIC',     glowClass:'g-mythic'},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+function newDomain(){return{xp:0,streak:0,lastActivity:null,lastMVH:null,weeklyDays:0,weeklyXP:0}}
+function newState(){
+  return{
+    totalXP:0,level:1,created:Date.now(),
+    lastWeeklyReview:null,lastPenaltyCheck:todayStr(),
+    weekStart:mondayStr(),weeklyXPEarned:0,perfectWeekChecked:false,
+    bestStreak:0,
+    domains:{articulation:newDomain(),ceo:newDomain(),kabbalah:newDomain(),ai:newDomain(),wellness:newDomain()},
+    logs:[],resources:[],penaltyLog:[]
+  };
+}
+
+let S=null;
+function load(){
+  try{
+    const r=localStorage.getItem('learningOS_v2');
+    S=r?JSON.parse(r):newState();
+    // ensure fields
+    if(!S.penaltyLog)S.penaltyLog=[];
+    if(!S.bestStreak)S.bestStreak=0;
+    if(!S.weeklyXPEarned)S.weeklyXPEarned=0;
+    if(S.perfectWeekChecked===undefined)S.perfectWeekChecked=false;
+    for(const k of DOMAIN_KEYS){
+      if(!S.domains[k])S.domains[k]=newDomain();
+      if(S.domains[k].weeklyXP===undefined)S.domains[k].weeklyXP=0;
+    }
+  }catch(e){S=newState();}
+}
+function save(){localStorage.setItem('learningOS_v2',JSON.stringify(S));}
+
+// ============================================================
+// DATE HELPERS
+// ============================================================
+function todayStr(){return new Date().toISOString().slice(0,10)}
+function mondayStr(date=new Date()){
+  const d=new Date(date);
+  const day=d.getDay();
+  const diff=(day===0)?-6:1-day;
+  d.setDate(d.getDate()+diff);
+  return d.toISOString().slice(0,10);
+}
+function daysBetween(a,b){
+  if(!a)return Infinity;
+  return Math.floor((new Date(b)-new Date(a))/86400000);
+}
+function isMonday(){return new Date().getDay()===1}
+function fmtDate(iso){
+  if(!iso)return '—';
+  const d=new Date(iso+'T12:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+// ============================================================
+// LEVEL SYSTEM
+// ============================================================
+function xpForLevel(n){return Math.floor(100*Math.pow(n,1.5))}
+function levelFromXP(xp){
+  let lv=1,acc=0;
+  while(lv<100){const n=xpForLevel(lv);if(acc+n>xp)break;acc+=n;lv++;}
+  return lv;
+}
+function xpIntoLevel(xp){
+  let lv=1,acc=0;
+  while(lv<100){const n=xpForLevel(lv);if(acc+n>xp)break;acc+=n;lv++;}
+  return{level:lv,current:xp-acc,needed:xpForLevel(lv)};
+}
+function getTier(level){return Math.ceil(level/10)}
+
+// ============================================================
+// CHARACTER SVG
+// ============================================================
+function getCharSVG(tier){
+  const SK='#f0c090', EYE='#1a0800', MO='#b06050';
+  const face=`
+    <rect x="22" y="6" width="20" height="20" fill="${SK}"/>
+    <rect x="26" y="12" width="4" height="4" fill="${EYE}"/>
+    <rect x="34" y="12" width="4" height="4" fill="${EYE}"/>
+    <rect x="28" y="20" width="8" height="2" fill="${MO}"/>`;
+
+  const svgs={
+    1:`<!-- PEASANT -->
+      <rect x="22" y="2" width="20" height="6" fill="#7a3b1e"/><rect x="20" y="5" width="4" height="8" fill="#7a3b1e"/><rect x="40" y="5" width="4" height="8" fill="#7a3b1e"/>
+      ${face}
+      <rect x="16" y="26" width="32" height="34" fill="#9a7030"/>
+      <rect x="8" y="26" width="10" height="22" fill="#9a7030"/>
+      <rect x="46" y="26" width="10" height="22" fill="#9a7030"/>
+      <rect x="8" y="48" width="10" height="8" fill="${SK}"/>
+      <rect x="46" y="48" width="10" height="8" fill="${SK}"/>
+      <rect x="18" y="60" width="12" height="28" fill="#6b4226"/>
+      <rect x="34" y="60" width="12" height="28" fill="#6b4226"/>
+      <rect x="16" y="84" width="14" height="8" fill="#2a1a0a"/>
+      <rect x="34" y="84" width="14" height="8" fill="#2a1a0a"/>`,
+
+    2:`<!-- WANDERER -->
+      <rect x="18" y="1" width="28" height="12" fill="#4a6741"/>
+      <rect x="16" y="8" width="32" height="8" fill="#4a6741"/>
+      ${face}
+      <rect x="12" y="26" width="40" height="36" fill="#557745"/>
+      <rect x="6" y="26" width="10" height="26" fill="#557745"/>
+      <rect x="48" y="26" width="10" height="26" fill="#557745"/>
+      <rect x="6" y="52" width="10" height="8" fill="${SK}"/>
+      <rect x="48" y="52" width="10" height="8" fill="${SK}"/>
+      <rect x="44" y="24" width="14" height="20" fill="#8b5e3c"/><rect x="46" y="26" width="10" height="16" fill="#7a4f30"/>
+      <rect x="18" y="62" width="12" height="26" fill="#3d5230"/>
+      <rect x="34" y="62" width="12" height="26" fill="#3d5230"/>
+      <rect x="16" y="84" width="14" height="8" fill="#1e2e14"/>
+      <rect x="34" y="84" width="14" height="8" fill="#1e2e14"/>
+      <rect x="4" y="28" width="3" height="62" fill="#8b6914"/>`,
+
+    3:`<!-- APPRENTICE -->
+      <rect x="20" y="-2" width="24" height="14" fill="#3040a0"/><rect x="18" y="4" width="28" height="10" fill="#2030a0"/>
+      <rect x="22" y="6" width="20" height="4" fill="#3848b8"/>
+      ${face}
+      <rect x="12" y="26" width="40" height="36" fill="#2a3888"/>
+      <rect x="8" y="26" width="10" height="24" fill="#2a3888"/>
+      <rect x="46" y="26" width="10" height="24" fill="#2a3888"/>
+      <rect x="8" y="50" width="10" height="8" fill="${SK}"/>
+      <rect x="46" y="50" width="10" height="8" fill="${SK}"/>
+      <rect x="12" y="60" width="18" height="32" fill="#1e2870"/>
+      <rect x="34" y="60" width="18" height="32" fill="#1e2870"/>
+      <rect x="56" y="20" width="4" height="70" fill="#c8a82a"/><rect x="54" y="22" width="8" height="6" fill="#e0c040"/>
+      <rect x="18" y="84" width="28" height="8" fill="#162060"/>`,
+
+    4:`<!-- SQUIRE -->
+      <rect x="20" y="2" width="24" height="20" fill="#808080"/><rect x="18" y="6" width="28" height="14" fill="#909090"/>
+      ${face}
+      <rect x="16" y="26" width="32" height="34" fill="#a0a0a0"/>
+      <rect x="10" y="26" width="10" height="22" fill="#a0a0a0"/>
+      <rect x="44" y="26" width="10" height="22" fill="#a0a0a0"/>
+      <rect x="10" y="48" width="10" height="8" fill="${SK}"/>
+      <rect x="44" y="48" width="10" height="8" fill="${SK}"/>
+      <rect x="18" y="60" width="12" height="28" fill="#505060"/>
+      <rect x="34" y="60" width="12" height="28" fill="#505060"/>
+      <rect x="16" y="84" width="14" height="8" fill="#303040"/>
+      <rect x="34" y="84" width="14" height="8" fill="#303040"/>
+      <rect x="50" y="30" width="4" height="40" fill="#c0c0d0"/><rect x="48" y="30" width="8" height="4" fill="#e0e0f0"/>
+      <rect x="22" y="34" width="20" height="2" fill="#c8a820"/>`,
+
+    5:`<!-- KNIGHT -->
+      <rect x="18" y="2" width="28" height="22" fill="#c0c0d0"/><rect x="16" y="8" width="32" height="14" fill="#d0d0e0"/>
+      <rect x="24" y="12" width="16" height="4" fill="#202030"/>
+      <rect x="22" y="6" width="20" height="20" fill="#b8b8c8"/>
+      <rect x="14" y="26" width="36" height="34" fill="#b8b8d0"/>
+      <rect x="6" y="26" width="12" height="24" fill="#b8b8d0"/>
+      <rect x="46" y="26" width="12" height="24" fill="#b8b8d0"/>
+      <rect x="6" y="50" width="12" height="8" fill="#d0d0e0"/>
+      <rect x="46" y="50" width="12" height="8" fill="#d0d0e0"/>
+      <rect x="16" y="60" width="14" height="28" fill="#9090a0"/>
+      <rect x="34" y="60" width="14" height="28" fill="#9090a0"/>
+      <rect x="14" y="84" width="16" height="8" fill="#606070"/>
+      <rect x="34" y="84" width="16" height="8" fill="#606070"/>
+      <rect x="52" y="22" width="4" height="48" fill="#e0e0f0"/><rect x="50" y="22" width="8" height="5" fill="#fff"/>
+      <rect x="2" y="26" width="16" height="22" fill="#9090a0"/><rect x="2" y="24" width="16" height="4" fill="#a8a8c0"/>
+      <rect x="20" y="30" width="24" height="2" fill="#ffd700"/><rect x="20" y="34" width="24" height="2" fill="#ffd700"/>`,
+
+    6:`<!-- VETERAN -->
+      <rect x="18" y="2" width="28" height="22" fill="#484858"/><rect x="16" y="8" width="32" height="14" fill="#505060"/>
+      <rect x="24" y="12" width="16" height="5" fill="#ff6060" opacity=".7"/>
+      <rect x="22" y="6" width="20" height="20" fill="#484858"/>
+      <rect x="14" y="26" width="36" height="34" fill="#404050"/>
+      <rect x="6" y="26" width="12" height="24" fill="#404050"/>
+      <rect x="46" y="26" width="12" height="24" fill="#404050"/>
+      <rect x="6" y="50" width="12" height="8" fill="#585868"/>
+      <rect x="46" y="50" width="12" height="8" fill="#585868"/>
+      <rect x="16" y="60" width="14" height="28" fill="#303040"/>
+      <rect x="34" y="60" width="14" height="28" fill="#303040"/>
+      <rect x="14" y="84" width="16" height="8" fill="#202030"/>
+      <rect x="34" y="84" width="16" height="8" fill="#202030"/>
+      <rect x="52" y="18" width="5" height="52" fill="#808090"/><rect x="50" y="18" width="9" height="5" fill="#a0a0b0"/>
+      <rect x="22" y="28" width="4" height="10" fill="#c04040" opacity=".6"/>
+      <rect x="36" y="38" width="6" height="3" fill="#c04040" opacity=".6"/>
+      <rect x="20" y="32" width="24" height="2" fill="#a03030"/>`,
+
+    7:`<!-- CHAMPION -->
+      <rect x="18" y="2" width="28" height="22" fill="#e8e8f8"/><rect x="16" y="8" width="32" height="14" fill="#f0f0ff"/>
+      <rect x="24" y="12" width="16" height="5" fill="#202040"/>
+      <rect x="22" y="6" width="20" height="20" fill="#dcdcec"/>
+      <rect x="14" y="26" width="36" height="34" fill="#e0e0f0"/>
+      <rect x="6" y="26" width="12" height="24" fill="#e0e0f0"/>
+      <rect x="46" y="26" width="12" height="24" fill="#e0e0f0"/>
+      <rect x="6" y="50" width="12" height="8" fill="#f0f0ff"/>
+      <rect x="46" y="50" width="12" height="8" fill="#f0f0ff"/>
+      <rect x="16" y="60" width="14" height="28" fill="#c0c0d0"/>
+      <rect x="34" y="60" width="14" height="28" fill="#c0c0d0"/>
+      <rect x="14" y="84" width="16" height="8" fill="#808090"/>
+      <rect x="34" y="84" width="16" height="8" fill="#808090"/>
+      <rect x="52" y="18" width="5" height="50" fill="#ffd700"/><rect x="50" y="18" width="9" height="5" fill="#ffe84d"/>
+      <rect x="2" y="26" width="16" height="24" fill="#c8c8e0"/><rect x="2" y="24" width="16" height="4" fill="#e0e0f0"/>
+      <rect x="20" y="28" width="24" height="3" fill="#ffd700"/><rect x="20" y="36" width="24" height="3" fill="#ffd700"/>
+      <rect x="8" y="18" width="4" height="56" fill="#9030c0" opacity=".8"/>`,
+
+    8:`<!-- ELITE -->
+      <rect x="18" y="2" width="28" height="22" fill="#1a1a2a"/><rect x="16" y="8" width="32" height="14" fill="#222238"/>
+      <rect x="24" y="12" width="16" height="5" fill="#ff4400" opacity=".8"/>
+      <rect x="22" y="6" width="20" height="20" fill="#181828"/>
+      <rect x="14" y="26" width="36" height="34" fill="#1c1c2e"/>
+      <rect x="6" y="26" width="12" height="24" fill="#1c1c2e"/>
+      <rect x="46" y="26" width="12" height="24" fill="#1c1c2e"/>
+      <rect x="6" y="50" width="12" height="8" fill="#282840"/>
+      <rect x="46" y="50" width="12" height="8" fill="#282840"/>
+      <rect x="16" y="60" width="14" height="28" fill="#141422"/>
+      <rect x="34" y="60" width="14" height="28" fill="#141422"/>
+      <rect x="14" y="84" width="16" height="8" fill="#0a0a14"/>
+      <rect x="34" y="84" width="16" height="8" fill="#0a0a14"/>
+      <rect x="20" y="28" width="24" height="3" fill="#ffd700"/><rect x="20" y="36" width="24" height="3" fill="#ffd700"/><rect x="20" y="44" width="24" height="3" fill="#ffd700"/>
+      <rect x="52" y="18" width="4" height="50" fill="#ffd700"/>
+      <rect x="4" y="28" width="4" height="44" fill="#ffd700"/>
+      <rect x="54" y="16" width="6" height="4" fill="#ffe84d"/>
+      <rect x="2" y="26" width="6" height="4" fill="#ffe84d"/>`,
+
+    9:`<!-- LEGEND -->
+      <rect x="2" y="10" width="8" height="40" fill="#6040a0" opacity=".6"/><rect x="54" y="10" width="8" height="40" fill="#6040a0" opacity=".6"/>
+      <rect x="18" y="2" width="28" height="22" fill="#4020a0"/><rect x="16" y="8" width="32" height="14" fill="#5028b8"/>
+      <rect x="24" y="12" width="16" height="5" fill="#c0e0ff"/>
+      <rect x="22" y="6" width="20" height="20" fill="#3818a0"/>
+      <rect x="14" y="26" width="36" height="34" fill="#3820a0"/>
+      <rect x="6" y="26" width="12" height="24" fill="#3820a0"/>
+      <rect x="46" y="26" width="12" height="24" fill="#3820a0"/>
+      <rect x="6" y="50" width="12" height="8" fill="#4030b0"/>
+      <rect x="46" y="50" width="12" height="8" fill="#4030b0"/>
+      <rect x="16" y="60" width="14" height="28" fill="#2810a0"/>
+      <rect x="34" y="60" width="14" height="28" fill="#2810a0"/>
+      <rect x="14" y="84" width="16" height="8" fill="#1808a0"/>
+      <rect x="34" y="84" width="16" height="8" fill="#1808a0"/>
+      <rect x="20" y="28" width="24" height="2" fill="#22d3ee"/><rect x="20" y="36" width="24" height="2" fill="#22d3ee"/><rect x="20" y="44" width="24" height="2" fill="#22d3ee"/>
+      <rect x="52" y="20" width="4" height="46" fill="#22d3ee"/>
+      <rect x="0" y="6" width="10" height="52" fill="#5028b8" opacity=".7"/><rect x="54" y="6" width="10" height="52" fill="#5028b8" opacity=".7"/>
+      <rect x="20" y="0" width="24" height="4" fill="#a040ff" opacity=".8"/>`,
+
+    10:`<!-- MYTHIC -->
+      <rect x="-4" y="0" width="14" height="64" fill="#a040ff" opacity=".5"/>
+      <rect x="54" y="0" width="14" height="64" fill="#22d3ee" opacity=".5"/>
+      <rect x="-4" y="64" width="14" height="20" fill="#ff40a0" opacity=".4"/>
+      <rect x="54" y="64" width="14" height="20" fill="#40ff80" opacity=".4"/>
+      <rect x="20" y="-4" width="24" height="8" fill="#ffd700"/>
+      <rect x="26" y="-8" width="12" height="6" fill="#fff"/>
+      <rect x="18" y="2" width="28" height="22" fill="#e0c060"/><rect x="16" y="8" width="32" height="14" fill="#f0d070"/>
+      <rect x="24" y="12" width="16" height="5" fill="#ffffff"/>
+      <rect x="22" y="6" width="20" height="20" fill="#d8b858"/>
+      <rect x="14" y="26" width="36" height="34" fill="#c8a040"/>
+      <rect x="6" y="26" width="12" height="24" fill="#c8a040"/>
+      <rect x="46" y="26" width="12" height="24" fill="#c8a040"/>
+      <rect x="6" y="50" width="12" height="8" fill="#e0c060"/>
+      <rect x="46" y="50" width="12" height="8" fill="#e0c060"/>
+      <rect x="16" y="60" width="14" height="28" fill="#b08030"/>
+      <rect x="34" y="60" width="14" height="28" fill="#b08030"/>
+      <rect x="14" y="84" width="16" height="8" fill="#806020"/>
+      <rect x="34" y="84" width="16" height="8" fill="#806020"/>
+      <rect x="18" y="26" width="28" height="3" fill="#fff"/><rect x="18" y="34" width="28" height="3" fill="#fff"/><rect x="18" y="42" width="28" height="3" fill="#fff"/>
+      <rect x="52" y="16" width="5" height="56" fill="#fff"/>
+      <rect x="2" y="24" width="5" height="56" fill="#fff"/>
+      <rect x="0" y="0" width="12" height="70" fill="url(#wl)" opacity=".6"/>
+      <rect x="52" y="0" width="12" height="70" fill="url(#wr)" opacity=".6"/>
+      <defs>
+        <linearGradient id="wl" x1="1" y1="0" x2="0" y2="0"><stop offset="0%" stop-color="#a040ff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="transparent"/></linearGradient>
+        <linearGradient id="wr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#a040ff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="transparent"/></linearGradient>
+      </defs>`
+  };
+
+  const t=Math.min(Math.max(tier,1),10);
+  return`<svg viewBox="0 0 64 96" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">${svgs[t]||svgs[1]}</svg>`;
+}
+
+// ============================================================
+// PENALTY ENGINE
+// ============================================================
+function runPenalties(){
+  const today=todayStr();
+  const msgs=[];
+
+  // New week check
+  const curMonday=mondayStr();
+  if(S.weekStart!==curMonday){
+    if(!S.perfectWeekChecked){
+      const allHit=DOMAIN_KEYS.every(k=>S.domains[k].weeklyDays>=ACTS[k].weeklyTarget);
+      if(allHit){
+        gainXP(100,null,'Perfect week bonus!');
+        msgs.push('★ PERFECT WEEK! +100 XP');
+      }
+    }
+    for(const k of DOMAIN_KEYS){S.domains[k].weeklyDays=0;S.domains[k].weeklyXP=0;}
+    S.weekStart=curMonday;
+    S.weeklyXPEarned=0;
+    S.perfectWeekChecked=false;
+  }
+
+  // Skip Monday review
+  if(S.lastPenaltyCheck&&S.lastPenaltyCheck!==today){
+    const lastMon=mondayStr(new Date(S.lastPenaltyCheck+'T12:00:00'));
+    if(lastMon!==curMonday&&S.lastWeeklyReview!==lastMon){
+      const pk=`review-${lastMon}`;
+      if(!S.penaltyLog.includes(pk)){
+        penaltyXP(-10,null,`Skipped weekly review (${lastMon})`,pk);
+        msgs.push('⚠ Missed weekly review: -10 XP');
+      }
+    }
+  }
+
+  for(const k of DOMAIN_KEYS){
+    const d=S.domains[k];
+    const gap=daysBetween(d.lastActivity,today);
+    const name=ACTS[k].name;
+
+    // 2 weeks untouched
+    if(gap>=14){
+      const pk=`untouched-${k}-${today.slice(0,7)}`;
+      if(!S.penaltyLog.includes(pk)){
+        penaltyXP(-20,k,`${name} untouched 2 weeks`,pk);
+        d.streak=0;
+        msgs.push(`⚠ ${name} untouched: -20 XP + streak reset`);
+      }
+    } else if(gap>=7){
+      // Decay 5%/week, floor 50%
+      const weeksInactive=(gap/7);
+      const decayPct=Math.min(weeksInactive*0.05,0.5);
+      const pk=`decay-${k}-${today}`;
+      if(!S.penaltyLog.includes(pk)&&d.xp>0){
+        const target=Math.max(Math.floor(d.xp*0.5),0);
+        const decayAmt=Math.min(Math.floor(d.xp*decayPct),d.xp-target);
+        if(decayAmt>0){
+          d.xp-=decayAmt;
+          S.penaltyLog.push(pk);
+          addLog(today,k,`${name} XP decay`,-decayAmt);
+          msgs.push(`⚠ ${name} decay: -${decayAmt} XP`);
+        }
+      }
+    }
+
+    // MVH 3 days missed (active domain, has done MVH before)
+    if(d.lastMVH&&gap<7){
+      const mvhGap=daysBetween(d.lastMVH,today);
+      if(mvhGap>=3){
+        // Key tied to lastMVH date — only fires once per missed streak
+        const pk=`mvh-${k}-${d.lastMVH}`;
+        if(!S.penaltyLog.includes(pk)){
+          penaltyXP(-5,k,`${name} missed MVH 3 days`,pk);
+          msgs.push(`⚠ ${name} missed MVH 3 days: -5 XP`);
+        }
+      }
+    }
+  }
+
+  // Resource unused 2 weeks
+  for(const r of S.resources){
+    const lastUse=r.lastUsed||r.acquired;
+    const resGap=daysBetween(lastUse,today);
+    if(resGap>=14){
+      const pk=`res-${r.id}-${today.slice(0,7)}`;
+      if(!S.penaltyLog.includes(pk)){
+        penaltyXP(-10,null,`Unused resource: ${r.name}`,pk);
+        msgs.push(`⚠ Unused resource "${r.name}": -10 XP`);
+      }
+    }
+  }
+
+  S.lastPenaltyCheck=today;
+  save();
+  return msgs;
+}
+
+function penaltyXP(amount,domain,note,penKey){
+  if(penKey)S.penaltyLog.push(penKey);
+  S.totalXP=Math.max(0,S.totalXP+amount);
+  if(domain)S.domains[domain].xp=Math.max(0,S.domains[domain].xp+amount);
+  addLog(todayStr(),domain||'global',note,amount);
+}
+
+// ============================================================
+// GAME ACTIONS
+// ============================================================
+function gainXP(amount,domain,note){
+  const prevLevel=S.level;
+  S.totalXP+=amount;
+  S.weeklyXPEarned+=amount;
+  if(domain){
+    S.domains[domain].xp+=amount;
+    S.domains[domain].weeklyXP+=amount;
+  }
+  addLog(todayStr(),domain||'global',note,amount);
+  S.level=levelFromXP(S.totalXP);
+  if(S.level>prevLevel){
+    const t=getTier(S.level);
+    setTimeout(()=>toast(`★ LEVEL UP! Level ${S.level} — ${TIERS[t].name}!`,'lvl'),200);
+  }
+  save();
+  render();
+}
+
+function addLog(date,domain,note,xp){
+  S.logs.unshift({date:date||todayStr(),domain:domain||'global',note:note||'',xp});
+  if(S.logs.length>300)S.logs=S.logs.slice(0,300);
+}
+
+function logActivity(domainKey,act){
+  const today=todayStr();
+  const d=S.domains[domainKey];
+  const cfg=ACTS[domainKey];
+
+  // Track MVH
+  if(act.isMVH)d.lastMVH=today;
+
+  // Streak logic
+  if(d.lastActivity!==today){
+    if(d.lastActivity&&daysBetween(d.lastActivity,today)===1){
+      d.streak++;
+    } else {
+      d.streak=(d.lastActivity)?1:1;
+    }
+    d.weeklyDays++;
+    if(d.streak>S.bestStreak)S.bestStreak=d.streak;
+    // 7-day streak bonus
+    if(d.streak>=7&&d.streak%7===0){
+      setTimeout(()=>{
+        gainXP(30,domainKey,`${cfg.name} ${d.streak}-day streak!`);
+        toast(`🔥 ${d.streak}-DAY STREAK! +30 XP`,'good');
+      },300);
+    }
+  }
+  d.lastActivity=today;
+
+  gainXP(act.xp,domainKey,`${cfg.name} — ${act.label}`);
+  toast(`+${act.xp} XP — ${act.label}`,'good');
+  closeModal();
+}
+
+function doWeeklyReview(){
+  const thisMonday=mondayStr();
+  if(S.lastWeeklyReview===thisMonday){toast('Already reviewed this week!','bad');return;}
+  S.lastWeeklyReview=thisMonday;
+  S.perfectWeekChecked=true;
+  gainXP(50,null,'Weekly review completed');
+  toast('+50 XP — Weekly Review done!','good');
+  document.getElementById('reviewBanner').style.display='none';
+}
+
+function addResource(){
+  const inp=document.getElementById('resInp');
+  const name=inp.value.trim();
+  if(!name)return;
+  S.resources.push({id:Date.now(),name,acquired:todayStr(),lastUsed:null});
+  inp.value='';
+  save();
+  renderResources();
+  toast(`Resource added: "${name}"`, 'good');
+}
+
+function useResource(id){
+  const r=S.resources.find(r=>r.id===id);
+  if(!r)return;
+  r.lastUsed=todayStr();
+  save();
+  renderResources();
+  toast(`Logged use of "${r.name}"`, 'good');
+}
+
+function deleteResource(id){
+  S.resources=S.resources.filter(r=>r.id!==id);
+  save();
+  renderResources();
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+let currentModal=null;
+
+function openLogModal(domainKey){
+  currentModal=domainKey;
+  const cfg=ACTS[domainKey];
+  document.getElementById('modalTitle').textContent=`LOG — ${cfg.name}`;
+
+  const items=cfg.activities.map(act=>`
+    <button class="act-btn" onclick="logActivity('${domainKey}',${JSON.stringify(act).replace(/"/g,'&quot;')})">
+      <span class="act-label">${act.label}</span>
+      <span class="act-xp">+${act.xp} XP</span>
+    </button>
+  `).join('');
+
+  document.getElementById('modalBody').innerHTML=`<div class="act-list">${items}</div>`;
+  document.getElementById('modalBg').style.display='flex';
+}
+
+function closeModal(e){
+  if(e&&e.target!==document.getElementById('modalBg'))return;
+  document.getElementById('modalBg').style.display='none';
+  currentModal=null;
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+let toastTimer=null;
+function toast(msg,type='good'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className=type==='bad'?'bad':type==='lvl'?'lvl':'';
+  el.style.display='block';
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{el.style.display='none';},3500);
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function render(){
+  S.level=levelFromXP(S.totalXP);
+  const lv=S.level;
+  const t=getTier(lv);
+  const tier=TIERS[t];
+  const {current,needed}=xpIntoLevel(S.totalXP);
+  const pct=Math.min((current/needed)*100,100);
+
+  // Header
+  document.getElementById('hdrXP').textContent=S.totalXP.toLocaleString()+' XP';
+  document.getElementById('hdrLv').textContent='LV.'+lv;
+
+  // Character
+  document.getElementById('charSVG').innerHTML=getCharSVG(t);
+  document.getElementById('charWrap').className='';
+  if(tier.glowClass)document.getElementById('charWrap').classList.add(tier.glowClass);
+  document.getElementById('charTier').textContent=tier.name;
+  document.getElementById('charLv').textContent=`Level ${lv} · Tier ${toRoman(t)}`;
+  document.getElementById('xpFill').style.width=pct+'%';
+  document.getElementById('xpLbl').textContent=`${current.toLocaleString()} / ${needed.toLocaleString()} XP to level ${lv+1}`;
+
+  // Stats
+  document.getElementById('sTotalXP').textContent=S.totalXP.toLocaleString();
+  document.getElementById('sLevel').textContent=lv;
+  document.getElementById('sWeekXP').textContent=S.weeklyXPEarned.toLocaleString();
+  document.getElementById('sBestStreak').textContent=S.bestStreak;
+
+  // Review banner
+  const reviewBanner=document.getElementById('reviewBanner');
+  if(isMonday()&&S.lastWeeklyReview!==mondayStr()){
+    reviewBanner.style.display='block';
+  } else {
+    reviewBanner.style.display='none';
+  }
+
+  renderDomainCards('dashGrid');
+  renderDomainCards('domainsGrid');
+  renderResources();
+  renderLog();
+}
+
+function renderDomainCards(containerId){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  el.innerHTML=DOMAIN_KEYS.map(k=>{
+    const cfg=ACTS[k];
+    const d=S.domains[k];
+    const pct=Math.min((d.weeklyDays/cfg.weeklyTarget)*100,100);
+    const done=d.weeklyDays>=cfg.weeklyTarget;
+    const lastAct=fmtDate(d.lastActivity);
+    const today=todayStr();
+    const gap=daysBetween(d.lastActivity,today);
+    const gapWarning=gap>=7&&d.lastActivity?` <span style="color:var(--red)">(${gap}d ago)</span>`:'';
+    return`<div class="dc">
+      <button class="dc-add" onclick="openLogModal('${k}')" title="Log activity">+</button>
+      <div class="dc-hdr">
+        <div>
+          <div class="dc-name" style="color:${cfg.color}">${cfg.icon} ${cfg.name}</div>
+          <div class="dc-streak">▲ ${d.streak}-day streak</div>
+        </div>
+      </div>
+      <div class="prog"><div class="prog-fill${done?' done':''}" style="width:${pct}%;background:${done?cfg.color:cfg.color}80;${done?'filter:brightness(1.4)':''}"></div></div>
+      <div class="dc-meta">
+        <span>${d.weeklyDays}/${cfg.weeklyTarget} days this week</span>
+        <span>${d.weeklyXP} XP this week</span>
+      </div>
+      <div class="dc-last">Last: ${lastAct}${gapWarning}</div>
+      <div style="font-size:6px;color:var(--muted)">Domain XP: ${d.xp.toLocaleString()}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderResources(){
+  const el=document.getElementById('resList');
+  if(!el)return;
+  const today=todayStr();
+  if(S.resources.length===0){
+    el.innerHTML=`<div style="font-size:7px;color:var(--muted);padding:16px;text-align:center">No resources tracked yet</div>`;
+    return;
+  }
+  el.innerHTML=S.resources.map(r=>{
+    const lastUse=r.lastUsed||r.acquired;
+    const gap=daysBetween(lastUse,today);
+    const warn=gap>=14?`<span class="res-warn">⚠ ${gap} days unused</span>`:'';
+    return`<div class="res-item">
+      <div class="res-left">
+        <div class="res-name">${r.name}</div>
+        <div class="res-meta">Added: ${fmtDate(r.acquired)} &nbsp;|&nbsp; Last used: ${fmtDate(r.lastUsed)} ${warn}</div>
+      </div>
+      <div class="res-btns">
+        <button class="btn-sm" onclick="useResource(${r.id})">USE</button>
+        <button class="btn-del" onclick="deleteResource(${r.id})">DEL</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLog(){
+  const tbody=document.getElementById('logBody');
+  if(!tbody)return;
+  if(S.logs.length===0){
+    tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--muted)">No activity logged yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=S.logs.slice(0,100).map(l=>{
+    const xpCls=l.xp>=0?'pos':'neg';
+    const xpStr=l.xp>=0?`+${l.xp}`:String(l.xp);
+    const domain=l.domain==='global'?'—':(ACTS[l.domain]?.name||l.domain);
+    return`<tr>
+      <td>${fmtDate(l.date)}</td>
+      <td>${domain}</td>
+      <td>${l.note}</td>
+      <td class="${xpCls}">${xpStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function switchTab(id,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tab-'+id).classList.add('on');
+  btn.classList.add('on');
+}
+
+// ============================================================
+// UTIL
+// ============================================================
+function toRoman(n){return['','I','II','III','IV','V','VI','VII','VIII','IX','X'][n]||n}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  load();
+  const msgs=runPenalties();
+
+  // Show penalty messages
+  if(msgs.length>0){
+    const box=document.getElementById('penaltyBox');
+    box.style.display='block';
+    box.innerHTML=`<h4>⚠ PENALTIES APPLIED</h4>`+msgs.map(m=>`<div>${m}</div>`).join('');
+    setTimeout(()=>{box.style.display='none';},8000);
+  }
+
+  render();
+
+  // Keyboard shortcut: Escape closes modal
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+});
+</script>
+</body>
+</html>

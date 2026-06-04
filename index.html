@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Learning OS</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <style>
 :root {
   --bg:#08080f; --surf:#111128; --surf2:#181832; --border:#252545;
@@ -145,6 +148,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   .char-panel{flex-direction:column;text-align:center}
   .stats{display:grid;grid-template-columns:1fr 1fr}
 }
+/* AUTH */
+.auth-area{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.auth-user{font-size:6px;color:var(--muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-dot{font-size:12px;line-height:1;transition:color .3s}
+.btn-signout{background:none;border:1px solid var(--muted);color:var(--muted);font-family:var(--font);font-size:6px;padding:3px 7px;cursor:pointer;white-space:nowrap}
+.btn-signout:hover{border-color:var(--text);color:var(--text)}
+.btn-signin{background:var(--gold);color:#000;border:none;font-family:var(--font);font-size:7px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+.btn-signin:hover{background:#ffe84d}
 </style>
 </head>
 <body>
@@ -153,6 +164,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   <span class="hdr-title">&#9876; LEARNING OS</span>
   <span class="hdr-xp" id="hdrXP">0 XP</span>
   <span class="hdr-lv" id="hdrLv">LV.1</span>
+  <div class="auth-area" id="authArea">
+    <button class="btn-signin" onclick="fbSignIn()">SIGN IN</button>
+  </div>
 </header>
 
 <div class="app">
@@ -324,7 +338,14 @@ function load(){
     }
   }catch(e){S=newState();}
 }
-function save(){localStorage.setItem('learningOS_v2',JSON.stringify(S));}
+function save(){
+  localStorage.setItem('learningOS_v2',JSON.stringify(S));
+  if(fbUser){
+    setSyncDot('syncing');
+    clearTimeout(fbSaveTimer);
+    fbSaveTimer=setTimeout(fbSave,1500);
+  }
+}
 
 // ============================================================
 // DATE HELPERS
@@ -933,6 +954,109 @@ function switchTab(id,btn){
 function toRoman(n){return['','I','II','III','IV','V','VI','VII','VIII','IX','X'][n]||n}
 
 // ============================================================
+// FIREBASE SYNC
+// ============================================================
+const FB_CFG={
+  apiKey:"AIzaSyDcX-Sv9aiA7ETzM4dCgJ97GkUM3rz1m4c",
+  authDomain:"learning-os-f0817.firebaseapp.com",
+  projectId:"learning-os-f0817",
+  storageBucket:"learning-os-f0817.firebasestorage.app",
+  messagingSenderId:"455886912756",
+  appId:"1:455886912756:web:781cd35d23ba1815faf2a1"
+};
+
+let fbUser=null,fbDb=null,fbAuth=null,fbSaveTimer=null;
+
+function initFirebase(){
+  firebase.initializeApp(FB_CFG);
+  fbAuth=firebase.auth();
+  fbDb=firebase.firestore();
+  fbAuth.onAuthStateChanged(async user=>{
+    fbUser=user;
+    renderAuthUI();
+    if(user) await fbPull();
+  });
+}
+
+async function fbSignIn(){
+  try{
+    await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  }catch(e){toast('Sign-in failed','bad');}
+}
+
+async function fbSignOut(){
+  await fbAuth.signOut();
+  fbUser=null;
+  renderAuthUI();
+}
+
+function fbRef(){
+  return fbUser&&fbDb?fbDb.collection('users').doc(fbUser.uid):null;
+}
+
+async function fbPull(){
+  const ref=fbRef();if(!ref)return;
+  setSyncDot('syncing');
+  try{
+    const snap=await ref.get();
+    if(snap.exists){
+      const remote=snap.data();
+      if(remote&&typeof remote.totalXP==='number'&&remote.totalXP>=S.totalXP){
+        // Remote wins — merge into S
+        S=Object.assign(newState(),remote);
+        // Ensure all domain keys exist after merge
+        for(const k of DOMAIN_KEYS){if(!S.domains[k])S.domains[k]=newDomain();}
+        if(!S.penaltyLog)S.penaltyLog=[];
+        localStorage.setItem('learningOS_v2',JSON.stringify(S));
+        runPenalties();
+        render();
+        toast('Cloud data loaded ☁','good');
+      }else{
+        await fbSave(); // local is ahead — push up
+      }
+    }else{
+      await fbSave(); // first sign-in — push local data up
+    }
+    setSyncDot('synced');
+  }catch(e){
+    setSyncDot('error');
+    console.error('Firestore pull:',e);
+  }
+}
+
+async function fbSave(){
+  const ref=fbRef();if(!ref)return;
+  try{
+    // Strip undefined values by round-tripping through JSON
+    await ref.set(JSON.parse(JSON.stringify(S)));
+    setSyncDot('synced');
+  }catch(e){
+    setSyncDot('error');
+    console.error('Firestore push:',e);
+  }
+}
+
+function setSyncDot(state){
+  const el=document.getElementById('syncDot');if(!el)return;
+  const map={syncing:['↻','#60a5fa'],synced:['✓','#4ade80'],error:['!','#f87171']};
+  const[icon,color]=map[state]||['','#6b7280'];
+  el.textContent=icon;el.style.color=color;
+}
+
+function renderAuthUI(){
+  const el=document.getElementById('authArea');if(!el)return;
+  if(fbUser){
+    const name=fbUser.email.split('@')[0];
+    el.innerHTML=`
+      <span class="auth-user" title="${fbUser.email}">${name}</span>
+      <span class="sync-dot" id="syncDot">✓</span>
+      <button class="btn-signout" onclick="fbSignOut()">OUT</button>`;
+  }else{
+    el.innerHTML=`<button class="btn-signin" onclick="fbSignIn()">SIGN IN</button>`;
+  }
+}
+
+// ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded',()=>{
@@ -948,6 +1072,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   render();
+  initFirebase();
 
   // Keyboard shortcut: Escape closes modal
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});

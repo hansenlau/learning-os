@@ -591,15 +591,17 @@ function runPenalties(){
   const curMonday=mondayStr();
   if(S.weekStart!==curMonday){
     if(!S.perfectWeekChecked){
-      const allHit=DOMAIN_KEYS.every(k=>S.domains[k].weeklyDays>=ACTS[k].weeklyTarget);
+      const prevMon=S.weekStart;
+      const allHit=DOMAIN_KEYS.every(k=>{
+        const days=new Set(S.logs.filter(e=>e.domain===k&&e.date>=prevMon&&e.date<curMonday&&e.xp>0).map(e=>e.date)).size;
+        return days>=ACTS[k].weeklyTarget;
+      });
       if(allHit){
         gainXP(100,null,'Perfect week bonus!');
         msgs.push('★ PERFECT WEEK! +100 XP');
       }
     }
-    for(const k of DOMAIN_KEYS){S.domains[k].weeklyDays=0;S.domains[k].weeklyXP=0;}
     S.weekStart=curMonday;
-    S.weeklyXPEarned=0;
     S.perfectWeekChecked=false;
   }
 
@@ -690,10 +692,8 @@ function penaltyXP(amount,domain,note,penKey){
 function gainXP(amount,domain,note){
   const prevLevel=S.level;
   S.totalXP+=amount;
-  S.weeklyXPEarned+=amount;
   if(domain){
     S.domains[domain].xp+=amount;
-    S.domains[domain].weeklyXP+=amount;
   }
   addLog(todayStr(),domain||'global',note,amount);
   S.level=levelFromXP(S.totalXP);
@@ -725,7 +725,6 @@ function logActivity(domainKey,act){
     } else {
       d.streak=(d.lastActivity)?1:1;
     }
-    d.weeklyDays++;
     if(d.streak>S.bestStreak)S.bestStreak=d.streak;
     // 7-day streak bonus
     if(d.streak>=7&&d.streak%7===0){
@@ -819,6 +818,22 @@ function toast(msg,type='good'){
 }
 
 // ============================================================
+// WEEKLY XP HELPERS (derived from logs — always sync-accurate)
+// ============================================================
+function getWeekXP(){
+  const mon=mondayStr();
+  return S.logs.filter(e=>e.date>=mon).reduce((s,e)=>s+(e.xp||0),0);
+}
+function getDomainWeekDays(k){
+  const mon=mondayStr();
+  return new Set(S.logs.filter(e=>e.domain===k&&e.date>=mon&&e.xp>0).map(e=>e.date)).size;
+}
+function getDomainWeekXP(k){
+  const mon=mondayStr();
+  return S.logs.filter(e=>e.domain===k&&e.date>=mon).reduce((s,e)=>s+(e.xp||0),0);
+}
+
+// ============================================================
 // RENDER
 // ============================================================
 function render(){
@@ -845,7 +860,7 @@ function render(){
   // Stats
   document.getElementById('sTotalXP').textContent=S.totalXP.toLocaleString();
   document.getElementById('sLevel').textContent=lv;
-  document.getElementById('sWeekXP').textContent=S.weeklyXPEarned.toLocaleString();
+  document.getElementById('sWeekXP').textContent=getWeekXP().toLocaleString();
   document.getElementById('sBestStreak').textContent=S.bestStreak;
 
   // Review banner
@@ -868,8 +883,9 @@ function renderDomainCards(containerId){
   el.innerHTML=DOMAIN_KEYS.map(k=>{
     const cfg=ACTS[k];
     const d=S.domains[k];
-    const pct=Math.min((d.weeklyDays/cfg.weeklyTarget)*100,100);
-    const done=d.weeklyDays>=cfg.weeklyTarget;
+    const wdays=getDomainWeekDays(k);
+    const pct=Math.min((wdays/cfg.weeklyTarget)*100,100);
+    const done=wdays>=cfg.weeklyTarget;
     const lastAct=fmtDate(d.lastActivity);
     const today=todayStr();
     const gap=daysBetween(d.lastActivity,today);
@@ -884,8 +900,8 @@ function renderDomainCards(containerId){
       </div>
       <div class="prog"><div class="prog-fill${done?' done':''}" style="width:${pct}%;background:${done?cfg.color:cfg.color}80;${done?'filter:brightness(1.4)':''}"></div></div>
       <div class="dc-meta">
-        <span>${d.weeklyDays}/${cfg.weeklyTarget} days this week</span>
-        <span>${d.weeklyXP} XP this week</span>
+        <span>${getDomainWeekDays(k)}/${cfg.weeklyTarget} days this week</span>
+        <span>${getDomainWeekXP(k)} XP this week</span>
       </div>
       <div class="dc-last">Last: ${lastAct}${gapWarning}</div>
       <div style="font-size:6px;color:var(--muted)">Domain XP: ${d.xp.toLocaleString()}</div>

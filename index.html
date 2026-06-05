@@ -994,6 +994,28 @@ function fbRef(){
   return fbUser&&fbDb?fbDb.collection('users').doc(fbUser.uid):null;
 }
 
+function mergeLogs(local,remote){
+  const seen=new Set();
+  return [...local,...(remote||[])].filter(e=>{
+    const k=`${e.date}|${e.domain}|${e.xp}|${e.note}`;
+    if(seen.has(k))return false;
+    seen.add(k);return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,300);
+}
+
+function mergeResources(local,remote){
+  const map=new Map();
+  for(const r of local)map.set(r.id,r);
+  for(const r of (remote||[])){
+    if(!map.has(r.id)){map.set(r.id,r);}
+    else{
+      const ex=map.get(r.id);
+      if((r.lastUsed||'')>(ex.lastUsed||''))map.set(r.id,r);
+    }
+  }
+  return Array.from(map.values()).sort((a,b)=>b.acquired.localeCompare(a.acquired));
+}
+
 async function fbPull(){
   const ref=fbRef();if(!ref)return;
   setSyncDot('syncing');
@@ -1001,18 +1023,25 @@ async function fbPull(){
     const snap=await ref.get();
     if(snap.exists){
       const remote=snap.data();
-      if(remote&&typeof remote.totalXP==='number'&&remote.totalXP>=S.totalXP){
-        // Remote wins — merge into S
-        S=Object.assign(newState(),remote);
-        // Ensure all domain keys exist after merge
-        for(const k of DOMAIN_KEYS){if(!S.domains[k])S.domains[k]=newDomain();}
-        if(!S.penaltyLog)S.penaltyLog=[];
+      if(remote&&typeof remote.totalXP==='number'){
+        const localLogs=S.logs||[];
+        const localResources=S.resources||[];
+        if(remote.totalXP>=S.totalXP){
+          // Remote wins core state
+          S=Object.assign(newState(),remote);
+          for(const k of DOMAIN_KEYS){if(!S.domains[k])S.domains[k]=newDomain();}
+          if(!S.penaltyLog)S.penaltyLog=[];
+          toast('Cloud data loaded ☁','good');
+        }
+        // Always union logs and resources from both sides
+        S.logs=mergeLogs(localLogs,remote.logs);
+        S.resources=mergeResources(localResources,remote.resources);
         localStorage.setItem('learningOS_v2',JSON.stringify(S));
         runPenalties();
         render();
-        toast('Cloud data loaded ☁','good');
+        await fbSave(); // push merged state back
       }else{
-        await fbSave(); // local is ahead — push up
+        await fbSave();
       }
     }else{
       await fbSave(); // first sign-in — push local data up

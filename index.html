@@ -349,25 +349,29 @@ function migrateCleanBadUntouchedPenalties(){
   const today=todayStr();
   for(const k of DOMAIN_KEYS){
     const d=S.domains[k];
-    // Find every month-keyed untouched penalty key that exists in the log
-    const badKeys=S.penaltyLog.filter(pk=>pk.startsWith(`untouched-${k}-`));
-    if(!badKeys.length)continue;
-    // Keep it only if the domain genuinely had 14+ days of inactivity at that time.
-    // We can't travel back in time, but if lastActivity is null the domain was never used,
-    // and if the current gap is <14 the penalty was wrong.
     const gap=d.lastActivity?daysBetween(d.lastActivity,today):Infinity;
     const isLegit=d.lastActivity&&gap>=14;
     if(isLegit)continue;
-    // Revert each bad key
+    // Revert bad penalty keys; only restore d.xp for domains that were actually used
+    // (never-used domains had d.xp=0 when penalty fired, so adding back 20 over-restores)
+    const badKeys=S.penaltyLog.filter(pk=>pk.startsWith(`untouched-${k}-`));
     for(const pk of badKeys){
       S.penaltyLog=S.penaltyLog.filter(p=>p!==pk);
-      // Restore XP taken (-20 each)
       S.totalXP+=20;
-      d.xp+=20;
+      if(d.lastActivity)d.xp+=20;
     }
-    // Remove matching log entries
+    // Always remove matching log entries — handles orphaned entries re-introduced
+    // by Firebase merge even when penalty keys are already cleaned
     const noteTxt=`${ACTS[k].name} untouched 2 weeks`;
     S.logs=S.logs.filter(l=>!(l.domain===k&&l.note===noteTxt));
+    // Also clean any decay entries fired on phantom XP from the over-restoration bug
+    if(!d.lastActivity){
+      const decayNote=`${ACTS[k].name} XP decay`;
+      const badDecayKeys=S.penaltyLog.filter(pk=>pk.startsWith(`decay-${k}-`));
+      for(const pk of badDecayKeys)S.penaltyLog=S.penaltyLog.filter(p=>p!==pk);
+      S.logs=S.logs.filter(l=>!(l.domain===k&&l.note===decayNote));
+      d.xp=0; // reset phantom XP back to 0
+    }
   }
 }
 function save(){
@@ -662,7 +666,7 @@ function runPenalties(){
         d.streak=0;
         msgs.push(`⚠ ${name} untouched: -20 XP + streak reset`);
       }
-    } else if(gap>=7){
+    } else if(d.lastActivity&&gap>=7){
       // Decay 5%/week, floor 50%
       const weeksInactive=(gap/7);
       const decayPct=Math.min(weeksInactive*0.05,0.5);

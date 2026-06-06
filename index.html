@@ -127,6 +127,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .btn-sm:hover{background:var(--green);color:#000}
 .btn-del{background:none;border:1px solid var(--red);color:var(--red);font-family:var(--font);font-size:7px;padding:4px 8px;cursor:pointer}
 .btn-del:hover{background:var(--red);color:#000}
+.btn-done{background:none;border:1px solid var(--gold);color:var(--gold);font-family:var(--font);font-size:7px;padding:4px 8px;cursor:pointer}
+.btn-done:hover{background:var(--gold);color:#000}
+.res-done{opacity:.5;border-style:dashed;background:#1a1a0e}
+.res-done .res-name{text-decoration:line-through}
 
 /* EFFECTS */
 .g-gold{animation:gg 2s ease-in-out infinite alternate}
@@ -691,6 +695,7 @@ function runPenalties(){
 
   // Resource unused 2 weeks
   for(const r of S.resources){
+    if(r.done)continue;
     const lastUse=r.lastUsed||r.acquired;
     const resGap=daysBetween(lastUse,today);
     if(resGap>=14){
@@ -797,6 +802,15 @@ function useResource(id){
   save();
   renderResources();
   toast(`Logged use of "${r.name}"`, 'good');
+}
+
+function doneResource(id){
+  const r=S.resources.find(r=>r.id===id);
+  if(!r)return;
+  r.done=true;
+  save();
+  renderResources();
+  toast(`"${r.name}" marked as done`,'good');
 }
 
 function deleteResource(id){
@@ -945,21 +959,27 @@ function renderResources(){
     el.innerHTML=`<div style="font-size:7px;color:var(--muted);padding:16px;text-align:center">No resources tracked yet</div>`;
     return;
   }
-  el.innerHTML=S.resources.map(r=>{
+  const active=S.resources.filter(r=>!r.done);
+  const done=S.resources.filter(r=>r.done);
+  const renderItem=r=>{
+    const isDone=!!r.done;
     const lastUse=r.lastUsed||r.acquired;
     const gap=daysBetween(lastUse,today);
-    const warn=gap>=14?`<span class="res-warn">⚠ ${gap} days unused</span>`:'';
-    return`<div class="res-item">
+    const warn=!isDone&&gap>=14?`<span class="res-warn">⚠ ${gap} days unused</span>`:'';
+    const doneTag=isDone?`<span style="color:var(--gold);font-size:6px">✓ DONE</span>`:'';
+    return`<div class="res-item${isDone?' res-done':''}">
       <div class="res-left">
         <div class="res-name">${r.name}</div>
-        <div class="res-meta">Added: ${fmtDate(r.acquired)} &nbsp;|&nbsp; Last used: ${fmtDate(r.lastUsed)} ${warn}</div>
+        <div class="res-meta">Added: ${fmtDate(r.acquired)} &nbsp;|&nbsp; Last used: ${fmtDate(r.lastUsed)} ${warn}${doneTag}</div>
       </div>
       <div class="res-btns">
-        <button class="btn-sm" onclick="useResource(${r.id})">USE</button>
+        ${!isDone?`<button class="btn-sm" onclick="useResource(${r.id})">USE</button>`:''}
+        ${!isDone?`<button class="btn-done" onclick="doneResource(${r.id})">DONE</button>`:''}
         <button class="btn-del" onclick="deleteResource(${r.id})">DEL</button>
       </div>
     </div>`;
-  }).join('');
+  };
+  el.innerHTML=[...active,...done].map(renderItem).join('');
 }
 
 function renderLog(){

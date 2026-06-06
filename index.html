@@ -336,7 +336,35 @@ function load(){
       if(!S.domains[k])S.domains[k]=newDomain();
       if(S.domains[k].weeklyXP===undefined)S.domains[k].weeklyXP=0;
     }
+    migrateCleanBadUntouchedPenalties();
   }catch(e){S=newState();}
+}
+
+// One-time cleanup: remove "untouched 2 weeks" penalties that fired when lastActivity was null
+function migrateCleanBadUntouchedPenalties(){
+  const today=todayStr();
+  for(const k of DOMAIN_KEYS){
+    const d=S.domains[k];
+    // Find every month-keyed untouched penalty key that exists in the log
+    const badKeys=S.penaltyLog.filter(pk=>pk.startsWith(`untouched-${k}-`));
+    if(!badKeys.length)continue;
+    // Keep it only if the domain genuinely had 14+ days of inactivity at that time.
+    // We can't travel back in time, but if lastActivity is null the domain was never used,
+    // and if the current gap is <14 the penalty was wrong.
+    const gap=d.lastActivity?daysBetween(d.lastActivity,today):Infinity;
+    const isLegit=d.lastActivity&&gap>=14;
+    if(isLegit)continue;
+    // Revert each bad key
+    for(const pk of badKeys){
+      S.penaltyLog=S.penaltyLog.filter(p=>p!==pk);
+      // Restore XP taken (-20 each)
+      S.totalXP+=20;
+      d.xp+=20;
+    }
+    // Remove matching log entries
+    const noteTxt=`${ACTS[k].name} untouched 2 weeks`;
+    S.logs=S.logs.filter(l=>!(l.domain===k&&l.note===noteTxt));
+  }
 }
 function save(){
   localStorage.setItem('learningOS_v2',JSON.stringify(S));
@@ -622,8 +650,8 @@ function runPenalties(){
     const gap=daysBetween(d.lastActivity,today);
     const name=ACTS[k].name;
 
-    // 2 weeks untouched
-    if(gap>=14){
+    // 2 weeks untouched (skip if never used)
+    if(d.lastActivity&&gap>=14){
       const pk=`untouched-${k}-${today.slice(0,7)}`;
       if(!S.penaltyLog.includes(pk)){
         penaltyXP(-20,k,`${name} untouched 2 weeks`,pk);

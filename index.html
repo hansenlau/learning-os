@@ -1080,10 +1080,11 @@ async function fbPull(){
         // Always union logs and resources from both sides
         S.logs=mergeLogs(localLogs,remote.logs);
         S.resources=mergeResources(localResources,remote.resources);
+        migrateCleanBadUntouchedPenalties(); // fix any bad penalties in cloud data
         localStorage.setItem('learningOS_v2',JSON.stringify(S));
         runPenalties();
         render();
-        await fbSave(); // push merged state back
+        await fbSave(); // push merged state back (now clean)
       }else{
         await fbSave();
       }

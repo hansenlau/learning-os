@@ -935,13 +935,18 @@ function renderDomainCards(containerId){
     const lastAct=fmtDate(d.lastActivity);
     const today=todayStr();
     const gap=daysBetween(d.lastActivity,today);
-    const gapWarning=gap>=7&&d.lastActivity?` <span style="color:var(--red)">(${gap}d ago)</span>`:'';
+    let ciText,ciColor;
+    if(!d.lastActivity){ciText='never checked in';ciColor='var(--muted)';}
+    else if(gap===0){ciText='✓ checked in today';ciColor='var(--green)';}
+    else if(gap===1){ciText='checked in yesterday';ciColor='var(--green)';}
+    else if(gap<7){ciText=`checked in ${gap}d ago`;ciColor='var(--gold)';}
+    else{ciText=`${gap}d since last check-in`;ciColor='var(--red)';}
     return`<div class="dc">
       <button class="dc-add" onclick="openLogModal('${k}')" title="Log activity">+</button>
       <div class="dc-hdr">
         <div>
           <div class="dc-name" style="color:${cfg.color}">${cfg.icon} ${cfg.name}</div>
-          <div class="dc-streak">▲ ${d.streak}-day streak</div>
+          <div class="dc-streak" style="color:${ciColor}">${ciText}</div>
         </div>
       </div>
       <div class="prog"><div class="prog-fill${done?' done':''}" style="width:${pct}%;background:${done?cfg.color:cfg.color}80;${done?'filter:brightness(1.4)':''}"></div></div>
@@ -949,7 +954,7 @@ function renderDomainCards(containerId){
         <span>${getDomainWeekDays(k)}/${cfg.weeklyTarget} days this week</span>
         <span>${getDomainWeekXP(k)} XP this week</span>
       </div>
-      <div class="dc-last">Last: ${lastAct}${gapWarning}</div>
+      <div class="dc-last">Last: ${lastAct}</div>
       <div style="font-size:6px;color:var(--muted)">Domain XP: ${d.xp.toLocaleString()}</div>
     </div>`;
   }).join('');

@@ -292,6 +292,12 @@ const ACTS = {
       {id:'golf',         label:'Golf session',                 xp:25, isMVH:false},
       {id:'exceeded',     label:'Exceeded target',              xp:15, isMVH:false},
     ]
+  },
+  checkin:{
+    name:'CHECK IN', color:'#22d3ee', icon:'★', weeklyTarget:7,
+    activities:[
+      {id:'daily', label:'Daily check-in', xp:5, isMVH:false}
+    ]
   }
 };
 
@@ -321,7 +327,7 @@ function newState(){
     lastWeeklyReview:null,lastPenaltyCheck:todayStr(),
     weekStart:mondayStr(),weeklyXPEarned:0,perfectWeekChecked:false,
     bestStreak:0,
-    domains:{articulation:newDomain(),ceo:newDomain(),kabbalah:newDomain(),ai:newDomain(),wellness:newDomain()},
+    domains:{articulation:newDomain(),ceo:newDomain(),kabbalah:newDomain(),ai:newDomain(),wellness:newDomain(),checkin:newDomain()},
     logs:[],resources:[],penaltyLog:[]
   };
 }
@@ -654,6 +660,7 @@ function runPenalties(){
   }
 
   for(const k of DOMAIN_KEYS){
+    if(k==='checkin')continue; // auto-managed, exempt from penalties
     const d=S.domains[k];
     const gap=daysBetween(d.lastActivity,today);
     const name=ACTS[k].name;
@@ -776,6 +783,23 @@ function logActivity(domainKey,act){
   gainXP(act.xp,domainKey,`${cfg.name} — ${act.label}`);
   toast(`+${act.xp} XP — ${act.label}`,'good');
   closeModal();
+}
+
+function doAutoCheckin(){
+  const today=todayStr();
+  const d=S.domains.checkin;
+  if(!d||d.lastActivity===today)return; // already checked in today
+  const prev=d.lastActivity;
+  if(prev&&daysBetween(prev,today)===1){d.streak++;}
+  else{d.streak=1;}
+  if(d.streak>S.bestStreak)S.bestStreak=d.streak;
+  if(d.streak>=7&&d.streak%7===0){
+    setTimeout(()=>{gainXP(30,'checkin',`CHECK IN ${d.streak}-day streak!`);
+      toast(`🔥 ${d.streak}-DAY STREAK! +30 XP`,'good');},400);
+  }
+  d.lastActivity=today;
+  gainXP(5,'checkin','Daily check-in');
+  toast('★ Daily check-in: +5 XP','good');
 }
 
 function doWeeklyReview(){
@@ -941,8 +965,14 @@ function renderDomainCards(containerId){
     else if(gap===1){ciText='checked in yesterday';ciColor='var(--green)';}
     else if(gap<7){ciText=`checked in ${gap}d ago`;ciColor='var(--gold)';}
     else{ciText=`${gap}d since last check-in`;ciColor='var(--red)';}
+    const isCheckin=k==='checkin';
+    const addBtn=isCheckin
+      ?(d.lastActivity===today
+        ?`<button class="dc-add" style="background:var(--green);cursor:default;font-size:11px" title="Checked in today">✓</button>`
+        :`<button class="dc-add" style="background:var(--cyan)" onclick="doAutoCheckin()" title="Check in now">★</button>`)
+      :`<button class="dc-add" onclick="openLogModal('${k}')" title="Log activity">+</button>`;
     return`<div class="dc">
-      <button class="dc-add" onclick="openLogModal('${k}')" title="Log activity">+</button>
+      ${addBtn}
       <div class="dc-hdr">
         <div>
           <div class="dc-name" style="color:${cfg.color}">${cfg.icon} ${cfg.name}</div>
@@ -1110,6 +1140,7 @@ async function fbPull(){
         S.logs=mergeLogs(localLogs,remote.logs);
         S.resources=mergeResources(localResources,remote.resources);
         migrateCleanBadUntouchedPenalties(); // fix any bad penalties in cloud data
+        doAutoCheckin(); // record today's check-in if not already done
         localStorage.setItem('learningOS_v2',JSON.stringify(S));
         runPenalties();
         render();
@@ -1164,6 +1195,7 @@ function renderAuthUI(){
 // ============================================================
 document.addEventListener('DOMContentLoaded',()=>{
   load();
+  doAutoCheckin();
   const msgs=runPenalties();
 
   // Show penalty messages

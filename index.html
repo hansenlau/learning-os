@@ -250,29 +250,35 @@ const ACTS = {
   articulation: {
     name:'ARTICULATION', color:'#818cf8', icon:'◈', weeklyTarget:5,
     activities:[
-      {id:'mvh',   label:'MVH — 2 min voice memo',            xp:10, isMVH:true},
-      {id:'full',  label:'Full session (5+ min talk)',         xp:25, isMVH:true},
-      {id:'read',  label:'Read aloud + paraphrase',            xp:25, isMVH:false},
-      {id:'tech',  label:'Technique review (filler/time)',     xp:15, isMVH:false},
-      {id:'real',  label:'Real-world application (call/meeting)',xp:15,isMVH:false},
+      {id:'mvh',      label:'MVH — 2 min voice memo',                    xp:10, isMVH:true},
+      {id:'full',     label:'Full session (5+ min talk)',                 xp:25, isMVH:true},
+      {id:'read',     label:'Read aloud + paraphrase',                    xp:25, isMVH:false},
+      {id:'tech',     label:'Technique review (filler/time)',             xp:15, isMVH:false},
+      {id:'real',     label:'Real-world application (call/meeting)',      xp:15, isMVH:false},
+      {id:'podcast',  label:'Listened to speech/comms podcast',           xp:10, isMVH:false},
+      {id:'speaker',  label:'Watched exemplary speaker / TED Talk',       xp:15, isMVH:false},
     ]
   },
   ceo:{
     name:'CEO SKILLS', color:'#f59e0b', icon:'◆', weeklyTarget:3,
     activities:[
-      {id:'mvh',     label:'MVH — 10 pages / 15 min podcast', xp:10, isMVH:true},
-      {id:'full',    label:'Full session',                     xp:25, isMVH:true},
-      {id:'applied', label:'Applied to real situation',        xp:15, isMVH:false},
-      {id:'insight', label:'Wrote insight to notes',           xp:10, isMVH:false},
+      {id:'mvh',      label:'MVH — 10 pages / 15 min podcast',           xp:10, isMVH:true},
+      {id:'full',     label:'Full session',                               xp:25, isMVH:true},
+      {id:'applied',  label:'Applied to real situation',                  xp:15, isMVH:false},
+      {id:'insight',  label:'Wrote insight to notes',                     xp:10, isMVH:false},
+      {id:'podcast',  label:'Listened to business/leadership podcast',    xp:10, isMVH:false},
+      {id:'talk',     label:'Watched CEO / founder interview / doc',      xp:15, isMVH:false},
     ]
   },
   kabbalah:{
     name:'KABBALAH', color:'#a855f7', icon:'✦', weeklyTarget:5,
     activities:[
-      {id:'mvh',       label:'MVH — 1 paragraph / 5 min',     xp:10, isMVH:true},
-      {id:'full',      label:'Full session (15+ min)',          xp:25, isMVH:true},
-      {id:'reflect',   label:'Post-challenge reflection',       xp:25, isMVH:false},
-      {id:'journal',   label:'Daily question journaling',       xp:10, isMVH:false},
+      {id:'mvh',      label:'MVH — 1 paragraph / 5 min',                 xp:10, isMVH:true},
+      {id:'full',     label:'Full session (15+ min)',                     xp:25, isMVH:true},
+      {id:'reflect',  label:'Post-challenge reflection',                  xp:25, isMVH:false},
+      {id:'journal',  label:'Daily question journaling',                  xp:10, isMVH:false},
+      {id:'text',     label:'Read kabbalah text / sefer',                 xp:15, isMVH:false},
+      {id:'lecture',  label:'Listened to kabbalah class / lecture',       xp:15, isMVH:false},
     ]
   },
   ai:{
@@ -430,7 +436,12 @@ function getTier(level){return Math.ceil(level/10)}
 // ============================================================
 // CHARACTER SVG
 // ============================================================
-function getCharSVG(tier){
+// Accent color per tier used for the level-pip row at the bottom of the SVG
+const TIER_ACCENT=['','#b08830','#4a9a4a','#3050d0','#a0a0a0','#ffd700','#d04040','#ffd700','#ff6030','#a040ff','#ffffff'];
+
+function getCharSVG(tier, level){
+  const levelInTier = level ? ((level-1)%10)+1 : 1;
+  const accentColor = TIER_ACCENT[Math.min(tier,10)]||'#ffd700';
   const SK='#f0c090', EYE='#1a0800', MO='#b06050';
   const face=`
     <rect x="22" y="6" width="20" height="20" fill="${SK}"/>
@@ -618,8 +629,13 @@ function getCharSVG(tier){
       </defs>`
   };
 
+  // Level pips: 10 slots at bottom of SVG, one fills per level within the tier
+  let pips=`<rect x="2" y="93" width="60" height="3" fill="#060606" opacity=".6"/>`;
+  for(let i=0;i<levelInTier;i++){
+    pips+=`<rect x="${2+i*6}" y="93" width="4" height="3" fill="${accentColor}" opacity="${(0.45+i*0.055).toFixed(2)}"/>`;
+  }
   const t=Math.min(Math.max(tier,1),10);
-  return`<svg viewBox="0 0 64 96" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">${svgs[t]||svgs[1]}</svg>`;
+  return`<svg viewBox="0 0 64 96" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">${svgs[t]||svgs[1]}${pips}</svg>`;
 }
 
 // ============================================================
@@ -919,7 +935,7 @@ function render(){
   document.getElementById('hdrLv').textContent='LV.'+lv;
 
   // Character
-  document.getElementById('charSVG').innerHTML=getCharSVG(t);
+  document.getElementById('charSVG').innerHTML=getCharSVG(t,lv);
   document.getElementById('charWrap').className='';
   if(tier.glowClass)document.getElementById('charWrap').classList.add(tier.glowClass);
   document.getElementById('charTier').textContent=tier.name;
